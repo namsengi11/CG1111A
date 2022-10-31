@@ -5,6 +5,11 @@
 
 #define IR_RECEIVER_PIN 4
 #define ULTRASONIC_PIN 12 // mCore port 1 -> digital pin 12
+#define LDR_PIN A1
+
+#define LDR_WAIT 10
+#define LDR_INTERVAL 10 //in milliseconds'
+#define LDR_TIMES 5
 
 MeDCMotor leftMotor(M1); // assigning leftMotor to port M1
 MeDCMotor rightMotor(M2); // assigning RightMotor to port M2
@@ -44,6 +49,7 @@ void enableComponent(Component c) {
     case B:
       analogWrite(CONTROL_PIN_0, 0);
       analogWrite(CONTROL_PIN_1, 255);
+      
       if (DEBUG) {
         Serial.println("Enabled LED B");
       }
@@ -63,9 +69,24 @@ void enableComponent(Component c) {
   }
 }
 
-float getDistanceIR () {
-
+int getLdrReading(int times) {
+  delay(LDR_WAIT);   
+  //find the average reading for the requested number of times of scanning LDR
+  int total = 0;
+  //take the reading as many times as requested and add them up
+  for(int i = 0; i < times; i += 1){
+     total += analogRead(LDR);
+     delay(LDR_INTERVAL);
+  }
+  //calculate the average and return it
+  return total/times;
 }
+
+float getDistanceIr () {
+  
+}
+
+enum Color {}
 
 float getDistanceUltraSonic() {
   pinMode(ULTRASONIC_PIN, OUTPUT);
