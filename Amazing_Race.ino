@@ -13,6 +13,8 @@
 
 MeDCMotor leftMotor(M1); // assigning leftMotor to port M1
 MeDCMotor rightMotor(M2); // assigning RightMotor to port M2
+uint8_t rightSpeed = 212;
+uint8_t leftSpeed = 255;
 
 MeLineFollower lineFinder(PORT_2);
 
@@ -28,6 +30,39 @@ enum Component {
 
 bool shouldStop() {
   return lineFinder.readSensors() == S1_IN_S2_IN;
+}
+
+void turn(int direction) { // for direction, 0 is left, 1 is right
+  if (direction == 0) {
+    leftMotor.run(leftSpeed);
+    rightMotor.run(rightSpeed);
+    delay(345);
+  } else {
+    leftMotor.run(-leftSpeed);
+    rightMotor.run(-rightSpeed);
+    delay(340);
+  }
+  leftMotor.run(0);
+  rightMotor.run(0);
+}
+
+void turn180() {
+  leftMotor.run(leftSpeed);
+  rightMotor.run(rightSpeed);
+  delay(640);
+  leftMotor.run(0);
+  rightMotor.run(0);
+}
+
+void turnTwice(int direction) {
+  turn(direction);
+  leftMotor.run(-leftSpeed);
+  rightMotor.run(rightSpeed);
+  delay(500);
+  leftMotor.run(0);
+  rightMotor.run(0);
+  delay(100);
+  turn(direction);
 }
 
 void enableComponent(Component c) {
@@ -75,7 +110,7 @@ int getLdrReading(int times) {
   int total = 0;
   //take the reading as many times as requested and add them up
   for(int i = 0; i < times; i += 1){
-     total += analogRead(LDR);
+     total += analogRead(LDR_PIN);
      delay(LDR_INTERVAL);
   }
   //calculate the average and return it
@@ -85,8 +120,6 @@ int getLdrReading(int times) {
 float getDistanceIr () {
   
 }
-
-enum Color {}
 
 float getDistanceUltraSonic() {
   pinMode(ULTRASONIC_PIN, OUTPUT);
@@ -118,7 +151,6 @@ void setup() {
 }
 
 void loop() {
-  delay(1000);
   // test ultrasonic
   float distance = getDistanceUltraSonic();
   if (distance > 0) {
@@ -132,14 +164,12 @@ void loop() {
     }
   }
 
-  delay(1000);
-  enableComponent(R);
-  delay(1000);
-  enableComponent(G);
-  delay(1000);
-  enableComponent(B);
-
-  delay(1000);
-  // test line tracer
-  Serial.println(shouldStop());
+  if (shouldStop()) {
+    delay(1000);
+    enableComponent(R);
+    delay(1000);
+    enableComponent(G);
+    delay(1000);
+    enableComponent(B);
+  }
 }
