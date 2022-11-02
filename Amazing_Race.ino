@@ -225,6 +225,22 @@ float getDistanceUltraSonic() {
   }
 }
 
+void adjust(int i) { // i = 0 left, i = 1 right
+  if (i == 0) {
+    Serial.println("adjusting left");
+//    while (getIntensityIr < 550) { // adjusting left uses ir
+//      leftMotor.run(-255);
+//      rightMotor.run(150);
+//    }
+  } else {
+    Serial.println("adjusting right");
+//    while (getDistanceUltraSonic < 5.5) { // adjusting right uses ultrasonic
+//      leftMotor.run(-150);
+//      rightMotor.run(212);
+//    }
+  }
+}
+
 void doAction(Color c) {
   switch (c) {
     case Black:
@@ -385,4 +401,10 @@ void loop() {
 
   celebrate();
   delay(500);
+
+  if (getIntensityIr() < 550) {
+    adjust(0);
+  } else if (getDistanceUltraSonic < 5.5) {
+    adjust(1);
+  }
 }
