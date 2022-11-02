@@ -18,7 +18,7 @@
 #define ultraSonicDistanceThreshold 8.5
 
 // IR parameter
-#define irIntensityThreshold 100
+#define irIntensityThreshold 200
 
 /* Debug switch.
  *  0: no debug
@@ -33,7 +33,7 @@ int DEBUG = 1;
 MeDCMotor leftMotor(M1);   // assigning leftMotor to port M1
 MeDCMotor rightMotor(M2);  // assigning RightMotor to port M2
 
-uint8_t rightSpeed = 235;
+uint8_t rightSpeed = 200;
 uint8_t leftSpeed = 255;
 
 // Line follower
@@ -123,30 +123,6 @@ void enableComponent(Component c) {
 }
 
 // Course logic and utils
-
-void startMovingForward() {
-  leftMotor.run(-leftSpeed);
-  rightMotor.run(rightSpeed);
-}
-
-void stopMoving() {
-  leftMotor.run(0);
-  rightMotor.run(0);
-}
-
-void adjust(int direction) { // 1 is turn left, -1 is turn right
-  if (direction == 1) {
-    leftMotor.run(-leftSpeed * 0.5);
-    rightMotor.run(rightSpeed);
-  } else if (direction == -1) {
-    leftMotor.run(-leftSpeed);
-    rightMotor.run(rightSpeed * 0.5);
-  } else {
-    if (DEBUG >= 2) {
-      Serial.println("Invalid input for adjustment");
-    }
-  }
-}
 void celebrate() {
   // Each of the following "function calls" plays a single tone.
   // The numbers in the bracket specify the frequency and the duration (ms)
@@ -159,15 +135,43 @@ void celebrate() {
   buzzer.noTone();
 }
 
-void turn(int direction) {  // for direction, 0 is left, 1 is right
-  if (direction == 0) {
+void startMovingForward() {
+  leftMotor.run(-leftSpeed);
+  rightMotor.run(rightSpeed);
+}
+
+void stopMoving() {
+  leftMotor.run(0);
+  rightMotor.run(0);
+}
+
+void adjust(int direction) { // -1 is turn left, 1 is turn right
+  if (direction == -1) {
+    leftMotor.run(-leftSpeed * 0.5);
+    rightMotor.run(rightSpeed);
+  } else if (direction == 1) {
+    leftMotor.run(-leftSpeed);
+    rightMotor.run(rightSpeed * 0.5);
+  } else {
+    if (DEBUG >= 2) {
+      Serial.println("Invalid input for adjustment");
+    }
+  }
+}
+
+void turn(int direction) {  // for direction, -1 is left, 1 is right
+  if (direction == -1) {
     leftMotor.run(leftSpeed);
     rightMotor.run(rightSpeed);
     delay(345);
-  } else {
+  } else if (direction == 1) {
     leftMotor.run(-leftSpeed);
     rightMotor.run(-rightSpeed);
     delay(340);
+  } else {
+    if (DEBUG >= 1) {
+      Serial.println("Invalid input for turn");;
+    }
   }
   stopMoving();
 }
@@ -200,14 +204,12 @@ int getLdrReading(int times) {
   for (int i = 0; i < times; i += 1) {
     int reading = analogRead(LDR_PIN);
     total += reading;
-    /*
-    if (DEBUG) {
+    if (DEBUG >= 3) {
       Serial.print("The ");
       Serial.print(i);
       Serial.print("th reading is ");
       Serial.println(reading);
     }
-    */
     delay(LDR_INTERVAL);
   }
   //calculate the average and return it
@@ -258,7 +260,7 @@ void doAction(Color c) {
       if (DEBUG >= 2) {
         Serial.println("Detected red");
       }
-      turn(0);
+      turn(-1);
       break;
     case Green:
       if (DEBUG >= 2) {
@@ -276,7 +278,7 @@ void doAction(Color c) {
       if (DEBUG >= 2) {
         Serial.println("Detected purple");
       }
-      turnTwice(0);
+      turnTwice(-1);
       break;
     case LightBlue:
       if (DEBUG >= 2) {
@@ -391,14 +393,12 @@ void setup() {
   }
   Serial.begin(9600);
 
-  delay(3000);
-  Serial.println("start");
+  delay(2000);
   startMovingForward();
 }
 
 void loop() {
   if (shouldStop()) {
-  //if (false) {
     stopMoving();
     if (DEBUG >= 1) {
       Serial.println("Detected black strip!");
@@ -408,6 +408,7 @@ void loop() {
     
     startMovingForward();
   } else {
+    
     // test ir
     int intensity = getIntensityIr();
     if (DEBUG >= 1) {
@@ -424,19 +425,25 @@ void loop() {
         Serial.println(distance);
       }
     } else {
-      if (DEBUG) {
+      if (DEBUG >= 1) {
         Serial.println("Ultrasonic distance out of range!");
       }
     }
     
+    
     if (distance < ultraSonicDistanceThreshold) {
-      Serial.println("Too left, turn right");
-      adjust(-1);
-    } else if (intensity < irIntensityThreshold) {
-      Serial.println("Too right, turn left");
+      if (DEBUG >= 1) {
+        Serial.println("Too left, turn right");
+      }
       adjust(1);
+    } else if (intensity < irIntensityThreshold) {
+      if (DEBUG >= 1) {
+        Serial.println("Too right, turn left");
+      }
+      adjust(-1);
     } else {
       startMovingForward();
     }
+    
   }
 }
