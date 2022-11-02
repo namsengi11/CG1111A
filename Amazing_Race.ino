@@ -169,25 +169,21 @@ void turn(int direction) {  // for direction, 0 is left, 1 is right
     rightMotor.run(-rightSpeed);
     delay(340);
   }
-  leftMotor.run(0);
-  rightMotor.run(0);
+  stopMoving();
 }
 
 void turn180() {
   leftMotor.run(-leftSpeed);
   rightMotor.run(-rightSpeed);
   delay(640);
-  leftMotor.run(0);
-  rightMotor.run(0);
+  stopMoving();
 }
 
 void turnTwice(int direction) {
   turn(direction);
-  leftMotor.run(-leftSpeed);
-  rightMotor.run(rightSpeed);
+  startMovingForward();
   delay(700);
-  leftMotor.run(0);
-  rightMotor.run(0);
+  stopMoving();
   delay(100);
   turn(direction);
 }
