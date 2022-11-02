@@ -33,11 +33,11 @@ MeLineFollower lineFinder(PORT_2);
 MeBuzzer buzzer;  // create the buzzer object
 
 // ColorRgb struct and Color enum definition
-struct ColorRgb {
+typedef struct ColorsRgb {
   int r;
   int g;
   int b;
-};
+} ColorRgb;
 
 enum Color {
   Red,
@@ -168,6 +168,22 @@ void turnTwice(int direction) {
   turn(direction);
 }
 
+void adjust(int i) { // i = 0 left, i = 1 right
+  if (i == 0) {
+    Serial.println("adjusting left");
+//    while (getIntensityIr < 550) { // adjusting left uses ir
+//      leftMotor.run(-255);
+//      rightMotor.run(150);
+//    }
+  } else {
+    Serial.println("adjusting right");
+//    while (getDistanceUltraSonic < 5.5) { // adjusting right uses ultrasonic
+//      leftMotor.run(-150);
+//      rightMotor.run(212);
+//    }
+  }
+}
+
 bool shouldStop() {
   return lineFinder.readSensors() == S1_IN_S2_IN;
 }
@@ -225,22 +241,6 @@ float getDistanceUltraSonic() {
   }
 }
 
-void adjust(int i) { // i = 0 left, i = 1 right
-  if (i == 0) {
-    Serial.println("adjusting left");
-//    while (getIntensityIr < 550) { // adjusting left uses ir
-//      leftMotor.run(-255);
-//      rightMotor.run(150);
-//    }
-  } else {
-    Serial.println("adjusting right");
-//    while (getDistanceUltraSonic < 5.5) { // adjusting right uses ultrasonic
-//      leftMotor.run(-150);
-//      rightMotor.run(212);
-//    }
-  }
-}
-
 void doAction(Color c) {
   switch (c) {
     case Black:
@@ -281,14 +281,14 @@ float normalizeProportion(float n) {
   return result;
 }
 
-float getColorDifference(struct ColorRgb colorA, struct ColorRgb colorB) {
+float getColorDifference(ColorRgb colorA, ColorRgb colorB) {
   //quadratic approach
   return pow(colorA.r - colorB.r, 2) + pow(colorA.g - colorB.g, 2) + pow(colorA.b - colorB.b, 2);
   //linear approach
   //return fabs(colorA.r - colorB.r) + fabs(colorA.g - colorB.g) + fabs(colorA.b - colorB.b);
 }
 
-Color colorRgbToColor(struct ColorRgb c) {
+Color colorRgbToColor(ColorRgb c) {
   Color result = Black;
   float minDiff = getColorDifference(c, black);
   float currentDiff = getColorDifference(c, red);
@@ -323,8 +323,8 @@ Color colorRgbToColor(struct ColorRgb c) {
   return result;
 }
 
-struct ColorRgb getColor() {
-  struct ColorRgb color;
+ColorRgb getColor() {
+  ColorRgb color;
   enableComponent(R);
   float rProportion = ((float)(getLdrReading(LDR_TIMES)) - blackValues[0]) / (greyDifference[0]);
   rProportion = normalizeProportion(rProportion);
@@ -391,7 +391,7 @@ void loop() {
   }
   delay(500);
 
-  struct ColorRgb color = getColor();
+  ColorRgb color = getColor();
   doAction(colorRgbToColor(color));
 
   delay(500);
@@ -401,7 +401,6 @@ void loop() {
 
   celebrate();
   delay(500);
-
   if (getIntensityIr() < 550) {
     adjust(0);
   } else if (getDistanceUltraSonic < 5.5) {
