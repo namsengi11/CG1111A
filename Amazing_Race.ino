@@ -33,11 +33,11 @@ MeLineFollower lineFinder(PORT_2);
 MeBuzzer buzzer;  // create the buzzer object
 
 // ColorRgb struct and Color enum definition
-struct ColorRgb {
+typedef struct ColorsRgb {
   int r;
   int g;
   int b;
-};
+} ColorRgb;
 
 enum Color {
   Red,
@@ -265,14 +265,14 @@ float normalizeProportion(float n) {
   return result;
 }
 
-float getColorDifference(struct ColorRgb colorA, struct ColorRgb colorB) {
+float getColorDifference(ColorRgb colorA, ColorRgb colorB) {
   //quadratic approach
   return pow(colorA.r - colorB.r, 2) + pow(colorA.g - colorB.g, 2) + pow(colorA.b - colorB.b, 2);
   //linear approach
   //return fabs(colorA.r - colorB.r) + fabs(colorA.g - colorB.g) + fabs(colorA.b - colorB.b);
 }
 
-Color colorRgbToColor(struct ColorRgb c) {
+Color colorRgbToColor(ColorRgb c) {
   Color result = Black;
   float minDiff = getColorDifference(c, black);
   float currentDiff = getColorDifference(c, red);
@@ -307,8 +307,8 @@ Color colorRgbToColor(struct ColorRgb c) {
   return result;
 }
 
-struct ColorRgb getColor() {
-  struct ColorRgb color;
+ColorRgb getColor() {
+  ColorRgb color;
   enableComponent(R);
   float rProportion = ((float)(getLdrReading(LDR_TIMES)) - blackValues[0]) / (greyDifference[0]);
   rProportion = normalizeProportion(rProportion);
@@ -375,7 +375,7 @@ void loop() {
   }
   delay(500);
 
-  struct ColorRgb color = getColor();
+  ColorRgb color = getColor();
   doAction(colorRgbToColor(color));
 
   delay(500);
