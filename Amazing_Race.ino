@@ -15,15 +15,25 @@
 // Ultrasonic sensor parameters
 #define TIMEOUT 30000       // in us
 #define SPEED_OF_SOUND 340  // in m/s
+#define ultraSonicDistanceThreshold 8.5
 
-// Debug switch
-bool DEBUG = true;
+// IR parameter
+#define irIntensityThreshold 100
+
+/* Debug switch.
+ *  0: no debug
+ *  1: IR ,ultrasonic and line tracer only
+ *  2: 1 and color sensor
+ *  3: all
+ * 
+ */
+int DEBUG = 1;
 
 // Motors and parameters
 MeDCMotor leftMotor(M1);   // assigning leftMotor to port M1
 MeDCMotor rightMotor(M2);  // assigning RightMotor to port M2
 
-uint8_t rightSpeed = 212;
+uint8_t rightSpeed = 235;
 uint8_t leftSpeed = 255;
 
 // Line follower
@@ -45,29 +55,19 @@ enum Color {
   Orange,
   Purple,
   LightBlue,
-  Black
+  White
 };
 
-//Zhengdao's values at home
-float whiteValues[] = { 741, 895, 813 };
-float blackValues[] = { 391, 530, 559 };
-ColorRgb red = { 244, 129, 115 };
-ColorRgb green = { 24, 150, 110 };
-ColorRgb orange = { 255, 170, 143 };
-ColorRgb purple = { 129, 144, 148 };
-ColorRgb lightBlue = { 95, 198, 200 };
-ColorRgb black = { 0, 0, 0 };
+// Always remeasure the rgb values below after changing this!
+float whiteValues[] = {771, 919, 840};
+float blackValues[] = {434, 598, 622};
 
-/*
-float whiteValues[] = {813, 921, 843};
-float blackValues[] = {500, 612, 633};
-ColorRgb red = {244, 129, 115};
-ColorRgb green = {24, 150, 110};
-ColorRgb orange = {255, 170, 143};
-ColorRgb purple = {129, 144, 148};
-ColorRgb lightBlue = {95, 198, 200};
-ColorRgb black = {0, 0, 0};
-*/
+ColorRgb red = {248, 138, 113};
+ColorRgb green = {44, 164, 113};
+ColorRgb orange = {255, 177, 141};
+ColorRgb purple = {137, 154, 147};
+ColorRgb lightBlue = {105, 204, 202};
+ColorRgb white = {255, 255, 255};
 
 // To be initialized after startup
 float greyDifference[] = { 0, 0, 0 };
@@ -86,14 +86,14 @@ void enableComponent(Component c) {
     case R:
       analogWrite(CONTROL_PIN_0, 255);
       analogWrite(CONTROL_PIN_1, 255);
-      if (DEBUG) {
+      if (DEBUG >= 3) {
         Serial.println("Enabled LED R");
       }
       break;
     case G:
       analogWrite(CONTROL_PIN_0, 255);
       analogWrite(CONTROL_PIN_1, 0);
-      if (DEBUG) {
+      if (DEBUG >= 3) {
         Serial.println("Enabled LED G");
       }
       break;
@@ -101,21 +101,21 @@ void enableComponent(Component c) {
       analogWrite(CONTROL_PIN_0, 0);
       analogWrite(CONTROL_PIN_1, 255);
 
-      if (DEBUG) {
+      if (DEBUG >= 3) {
         Serial.println("Enabled LED B");
       }
       break;
     case IrEmmiter:
       analogWrite(CONTROL_PIN_0, 0);
       analogWrite(CONTROL_PIN_1, 0);
-      if (DEBUG) {
+      if (DEBUG >= 3) {
         Serial.println("Enabled IR emmiter");
       }
       break;
     default:  // default is R
       analogWrite(CONTROL_PIN_0, 255);
       analogWrite(CONTROL_PIN_1, 255);
-      if (DEBUG) {
+      if (DEBUG >= 3) {
         Serial.println("Default: Enabled LED R");
       }
       break;
@@ -123,6 +123,30 @@ void enableComponent(Component c) {
 }
 
 // Course logic and utils
+
+void startMovingForward() {
+  leftMotor.run(-leftSpeed);
+  rightMotor.run(rightSpeed);
+}
+
+void stopMoving() {
+  leftMotor.run(0);
+  rightMotor.run(0);
+}
+
+void adjust(int direction) { // 1 is turn left, -1 is turn right
+  if (direction == 1) {
+    leftMotor.run(-leftSpeed * 0.5);
+    rightMotor.run(rightSpeed);
+  } else if (direction == -1) {
+    leftMotor.run(-leftSpeed);
+    rightMotor.run(rightSpeed * 0.5);
+  } else {
+    if (DEBUG >= 2) {
+      Serial.println("Invalid input for adjustment");
+    }
+  }
+}
 void celebrate() {
   // Each of the following "function calls" plays a single tone.
   // The numbers in the bracket specify the frequency and the duration (ms)
@@ -150,8 +174,8 @@ void turn(int direction) {  // for direction, 0 is left, 1 is right
 }
 
 void turn180() {
-  leftMotor.run(leftSpeed);
-  rightMotor.run(rightSpeed);
+  leftMotor.run(-leftSpeed);
+  rightMotor.run(-rightSpeed);
   delay(640);
   leftMotor.run(0);
   rightMotor.run(0);
@@ -161,27 +185,11 @@ void turnTwice(int direction) {
   turn(direction);
   leftMotor.run(-leftSpeed);
   rightMotor.run(rightSpeed);
-  delay(500);
+  delay(700);
   leftMotor.run(0);
   rightMotor.run(0);
   delay(100);
   turn(direction);
-}
-
-void adjust(int i) { // i = 0 left, i = 1 right
-  if (i == 0) {
-    Serial.println("adjusting left");
-//    while (getIntensityIr < 550) { // adjusting left uses ir
-//      leftMotor.run(-255);
-//      rightMotor.run(150);
-//    }
-  } else {
-    Serial.println("adjusting right");
-//    while (getDistanceUltraSonic < 5.5) { // adjusting right uses ultrasonic
-//      leftMotor.run(-150);
-//      rightMotor.run(212);
-//    }
-  }
 }
 
 bool shouldStop() {
@@ -208,7 +216,7 @@ int getLdrReading(int times) {
   }
   //calculate the average and return it
   int result = (int)(total / times);
-  if (DEBUG) {
+  if (DEBUG >= 1) {
     Serial.print("LDR reading is ");
     Serial.println(result);
   }
@@ -216,9 +224,9 @@ int getLdrReading(int times) {
 }
 
 int getIntensityIr() {
-  delayMicroseconds(2);
+  delay(10);
   enableComponent(IrEmmiter);
-  delayMicroseconds(10);
+  delay(10);
   int intensity = analogRead(IR_RECEIVER_PIN);
   enableComponent(R);
   return intensity;
@@ -243,26 +251,47 @@ float getDistanceUltraSonic() {
 
 void doAction(Color c) {
   switch (c) {
-    case Black:
-      Serial.println("Detected black");
+    case White:
+      if (DEBUG >= 2) {
+        Serial.println("Detected white");
+      }
+      celebrate();
+      delay(999999999);
       break;
     case Red:
-      Serial.println("Detected red");
+      if (DEBUG >= 2) {
+        Serial.println("Detected red");
+      }
+      turn(0);
       break;
     case Green:
-      Serial.println("Detected green");
+      if (DEBUG >= 2) {
+        Serial.println("Detected green");
+      }
+      turn(1);
       break;
     case Orange:
-      Serial.println("Detected orange");
+      if (DEBUG >= 2) {
+        Serial.println("Detected orange");
+      }
+      turn180();
       break;
     case Purple:
-      Serial.println("Detected purple");
+      if (DEBUG >= 2) {
+        Serial.println("Detected purple");
+      }
+      turnTwice(0);
       break;
     case LightBlue:
-      Serial.println("Detected LightBlue");
+      if (DEBUG >= 2) {
+        Serial.println("Detected light blue");
+      }
+      turnTwice(1);
       break;
     default:
-      Serial.println("No color detected, is there a bug?");
+      if (DEBUG >= 2) {
+        Serial.println("No color detected, is there a bug?");
+      }
   }
 }
 
@@ -289,8 +318,8 @@ float getColorDifference(ColorRgb colorA, ColorRgb colorB) {
 }
 
 Color colorRgbToColor(ColorRgb c) {
-  Color result = Black;
-  float minDiff = getColorDifference(c, black);
+  Color result = White;
+  float minDiff = getColorDifference(c, white);
   float currentDiff = getColorDifference(c, red);
   if (currentDiff < minDiff) {
     result = Red;
@@ -338,7 +367,7 @@ ColorRgb getColor() {
   bProportion = normalizeProportion(bProportion);
   color.b = bProportion * 255;
   enableComponent(R);  // change to default state
-  if (DEBUG) {
+  if (DEBUG >= 2) {
     Serial.print("Normalized R value is ");
     Serial.println(color.r);
     Serial.print("Normalized G value is ");
@@ -364,46 +393,54 @@ void setup() {
   for (int i = 0; i < 3; i += 1) {
     greyDifference[i] = whiteValues[i] - blackValues[i];
   }
-
   Serial.begin(9600);
+
+  delay(3000);
+  Serial.println("start");
+  startMovingForward();
 }
 
 void loop() {
-  // test ultrasonic
-  float distance = getDistanceUltraSonic();
-  if (distance > 0) {
-    if (DEBUG) {
-      Serial.print("Distance is ");
-      Serial.println(distance);
+  if (shouldStop()) {
+  //if (false) {
+    stopMoving();
+    if (DEBUG >= 1) {
+      Serial.println("Detected black strip!");
     }
+    ColorRgb color = getColor();
+    doAction(colorRgbToColor(color));
+    
+    startMovingForward();
   } else {
-    if (DEBUG) {
-      Serial.println("Out of range!");
+    // test ir
+    int intensity = getIntensityIr();
+    if (DEBUG >= 1) {
+      Serial.print("IR intensity is ");
+      Serial.println(intensity);
     }
-  }
 
-  delay(500);
-
-  int intensity = getIntensityIr();
-  if (DEBUG) {
-    Serial.print("Intensity is ");
-    Serial.println(intensity);
-  }
-  delay(500);
-
-  ColorRgb color = getColor();
-  doAction(colorRgbToColor(color));
-
-  delay(500);
-  // test line tracer
-  Serial.println(shouldStop());
-  delay(500);
-
-  celebrate();
-  delay(500);
-  if (getIntensityIr() < 550) {
-    adjust(0);
-  } else if (getDistanceUltraSonic < 5.5) {
-    adjust(1);
+    
+    // test ultrasonic
+    float distance = getDistanceUltraSonic();
+    if (distance > 0) { // < 0 means reading not valid
+      if (DEBUG >= 1) {
+        Serial.print("Ultrasonic distance is ");
+        Serial.println(distance);
+      }
+    } else {
+      if (DEBUG) {
+        Serial.println("Ultrasonic distance out of range!");
+      }
+    }
+    
+    if (distance < ultraSonicDistanceThreshold) {
+      Serial.println("Too left, turn right");
+      adjust(-1);
+    } else if (intensity < irIntensityThreshold) {
+      Serial.println("Too right, turn left");
+      adjust(1);
+    } else {
+      startMovingForward();
+    }
   }
 }
