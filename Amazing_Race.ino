@@ -8,37 +8,33 @@
 #define LDR_PIN A1
 
 // LDR parameters
-#define LDR_WAIT 20
-#define LDR_INTERVAL 10  //in milliseconds'
+#define LDR_WAIT 40
+#define LDR_INTERVAL 10  //in milliseconds
 #define LDR_TIMES 5
 
 // Ultrasonic sensor parameters
 #define TIMEOUT 30000       // in us
 #define SPEED_OF_SOUND 340  // in m/s
-#define ultraSonicDistanceThreshold 8.5 // in cm
+#define ultraSonicDistanceThreshold 9.5 // in cm
 
 // IR parameter
-#define irIntensityThreshold 200
+#define irIntensityThreshold 65
 
-#define stopCoolDown 500 // in ms
-
-// Storing the time of last stop
-long lastStopTime = 0;
 
 /* Debug switch.
- *  0: no debug
- *  1: IR ,ultrasonic, line tracer and motors
- *  2: 1 and color sensor
- *  3: all
- * 
- */
-int DEBUG = 1;
+    0: no debug
+    1: IR ,ultrasonic, line tracer and motors
+    2: 1 and color sensor
+    3: all
+
+*/
+int DEBUG = 0;
 
 // Motors and parameters
 MeDCMotor leftMotor(M1);   // assigning leftMotor to port M1
 MeDCMotor rightMotor(M2);  // assigning RightMotor to port M2
 
-uint8_t rightSpeed = 200;
+uint8_t rightSpeed = 255;
 uint8_t leftSpeed = 255;
 
 // Line follower
@@ -65,14 +61,15 @@ enum Color {
 };
 
 // Always remeasure the rgb values below after changing this!
-float whiteValues[] = { 771, 919, 840 };
-float blackValues[] = { 434, 598, 622 };
+float whiteValues[] = { 704, 936, 801 };
+float blackValues[] = { 288, 605, 431 };
 
-ColorRgb red = { 248, 138, 113 };
-ColorRgb green = { 44, 164, 113 };
-ColorRgb orange = { 255, 177, 141 };
-ColorRgb purple = { 137, 154, 147 };
-ColorRgb lightBlue = { 105, 204, 202 };
+// Always remeasure these values after changing the values above!
+ColorRgb red = { 232, 118, 91 };
+ColorRgb green = { 44, 181, 123 };
+ColorRgb orange = { 250, 180, 135 };
+ColorRgb purple = { 125, 158, 161 };
+ColorRgb lightBlue = { 107, 218, 223 };
 ColorRgb white = { 255, 255, 255 };
 
 // To be initialized after startup
@@ -159,12 +156,12 @@ void stopMoving() {
 void adjust(Direction d) {
   switch (d) {
     case Left:
-      leftMotor.run(-leftSpeed * 0.5);
+      leftMotor.run(-leftSpeed * 0.75);
       rightMotor.run(rightSpeed);
       break;
     case Right:
       leftMotor.run(-leftSpeed);
-      rightMotor.run(rightSpeed * 0.5);
+      rightMotor.run(rightSpeed * 0.75);
       break;
     default:
       if (DEBUG >= 1) {
@@ -204,7 +201,7 @@ void turn180() {
 void turnTwice(Direction d) {
   turn(d);
   startMovingForward();
-  delay(700);
+  delay(900);
   stopMoving();
   delay(100);
   turn(d);
@@ -212,14 +209,11 @@ void turnTwice(Direction d) {
 
 bool shouldStop() {
   bool isBlackStripDetected = lineFinder.readSensors() == S1_IN_S2_IN;
-  bool isCoolDownFinished = millis() - lastStopTime > stopCoolDown;
   if (DEBUG >= 1) {
     Serial.print("Detected black strip? ");
     Serial.println(isBlackStripDetected);
-    Serial.print("Cool down finished? ");
-    Serial.println(isCoolDownFinished);
   }
-  return isBlackStripDetected && isCoolDownFinished;
+  return isBlackStripDetected;
 }
 
 int getLdrReading(int times) {
@@ -230,7 +224,7 @@ int getLdrReading(int times) {
   for (int i = 0; i < times; i += 1) {
     int reading = analogRead(LDR_PIN);
     total += reading;
-    if (DEBUG >= 3) {
+    if (DEBUG >= 4) {
       Serial.print("The ");
       Serial.print(i);
       Serial.print("th reading is ");
@@ -431,9 +425,6 @@ void loop() {
     }
     ColorRgb color = getColor();
     doAction(colorRgbToColor(color));
-    // Update lastStopTime to start cool down counting
-    lastStopTime = millis();
-    startMovingForward();
   } else {
 
     // test ir
@@ -442,7 +433,6 @@ void loop() {
       Serial.print("IR intensity is ");
       Serial.println(intensity);
     }
-
 
     // test ultrasonic
     float distance = getDistanceUltraSonic();
@@ -457,17 +447,17 @@ void loop() {
       }
     }
 
-
+    // Do action according to readings
     if (distance < ultraSonicDistanceThreshold) {
       if (DEBUG >= 1) {
         Serial.println("Too left, turn right");
       }
-      adjust(1);
+      adjust(Right);
     } else if (intensity < irIntensityThreshold) {
       if (DEBUG >= 1) {
         Serial.println("Too right, turn left");
       }
-      adjust(-1);
+      adjust(Left);
     } else {
       startMovingForward();
     }
