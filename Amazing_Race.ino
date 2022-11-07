@@ -15,14 +15,19 @@
 // Ultrasonic sensor parameters
 #define TIMEOUT 30000       // in us
 #define SPEED_OF_SOUND 340  // in m/s
-#define ultraSonicDistanceThreshold 8.5
+#define ultraSonicDistanceThreshold 8.5 // in cm
 
 // IR parameter
 #define irIntensityThreshold 200
 
+#define stopCoolDown 500 // in ms
+
+// Storing the time of last stop
+long lastStopTime = 0;
+
 /* Debug switch.
  *  0: no debug
- *  1: IR ,ultrasonic and line tracer only
+ *  1: IR ,ultrasonic, line tracer and motors
  *  2: 1 and color sensor
  *  3: all
  * 
@@ -49,6 +54,7 @@ typedef struct ColorsRgb {
   int b;
 } ColorRgb;
 
+
 enum Color {
   Red,
   Green,
@@ -59,19 +65,24 @@ enum Color {
 };
 
 // Always remeasure the rgb values below after changing this!
-float whiteValues[] = {771, 919, 840};
-float blackValues[] = {434, 598, 622};
+float whiteValues[] = { 771, 919, 840 };
+float blackValues[] = { 434, 598, 622 };
 
-ColorRgb red = {248, 138, 113};
-ColorRgb green = {44, 164, 113};
-ColorRgb orange = {255, 177, 141};
-ColorRgb purple = {137, 154, 147};
-ColorRgb lightBlue = {105, 204, 202};
-ColorRgb white = {255, 255, 255};
+ColorRgb red = { 248, 138, 113 };
+ColorRgb green = { 44, 164, 113 };
+ColorRgb orange = { 255, 177, 141 };
+ColorRgb purple = { 137, 154, 147 };
+ColorRgb lightBlue = { 105, 204, 202 };
+ColorRgb white = { 255, 255, 255 };
 
 // To be initialized after startup
 float greyDifference[] = { 0, 0, 0 };
 
+// Direction enum
+enum Direction {
+  Left,
+  Right
+};
 
 // Component management
 enum Component {
@@ -145,33 +156,40 @@ void stopMoving() {
   rightMotor.run(0);
 }
 
-void adjust(int direction) { // -1 is turn left, 1 is turn right
-  if (direction == -1) {
-    leftMotor.run(-leftSpeed * 0.5);
-    rightMotor.run(rightSpeed);
-  } else if (direction == 1) {
-    leftMotor.run(-leftSpeed);
-    rightMotor.run(rightSpeed * 0.5);
-  } else {
-    if (DEBUG >= 2) {
-      Serial.println("Invalid input for adjustment");
-    }
+void adjust(Direction d) {
+  switch (d) {
+    case Left:
+      leftMotor.run(-leftSpeed * 0.5);
+      rightMotor.run(rightSpeed);
+      break;
+    case Right:
+      leftMotor.run(-leftSpeed);
+      rightMotor.run(rightSpeed * 0.5);
+      break;
+    default:
+      if (DEBUG >= 1) {
+        Serial.println("Invalid input for adjustment");
+      }
   }
 }
 
-void turn(int direction) {  // for direction, -1 is left, 1 is right
-  if (direction == -1) {
-    leftMotor.run(leftSpeed);
-    rightMotor.run(rightSpeed);
-    delay(345);
-  } else if (direction == 1) {
-    leftMotor.run(-leftSpeed);
-    rightMotor.run(-rightSpeed);
-    delay(340);
-  } else {
-    if (DEBUG >= 1) {
-      Serial.println("Invalid input for turn");;
-    }
+void turn(Direction d) {
+  switch (d) {
+    case Left:
+      leftMotor.run(leftSpeed);
+      rightMotor.run(rightSpeed);
+      delay(345);
+      break;
+    case Right:
+      leftMotor.run(-leftSpeed);
+      rightMotor.run(-rightSpeed);
+      delay(340);
+      break;
+    default:
+      if (DEBUG >= 1) {
+        Serial.println("Invalid input for turn");
+        ;
+      }
   }
   stopMoving();
 }
@@ -183,17 +201,25 @@ void turn180() {
   stopMoving();
 }
 
-void turnTwice(int direction) {
-  turn(direction);
+void turnTwice(Direction d) {
+  turn(d);
   startMovingForward();
   delay(700);
   stopMoving();
   delay(100);
-  turn(direction);
+  turn(d);
 }
 
 bool shouldStop() {
-  return lineFinder.readSensors() == S1_IN_S2_IN;
+  bool isBlackStripDetected = lineFinder.readSensors() == S1_IN_S2_IN;
+  bool isCoolDownFinished = millis() - lastStopTime > stopCoolDown;
+  if (DEBUG >= 1) {
+    Serial.print("Detected black strip? ");
+    Serial.println(isBlackStripDetected);
+    Serial.print("Cool down finished? ");
+    Serial.println(isCoolDownFinished);
+  }
+  return isBlackStripDetected && isCoolDownFinished;
 }
 
 int getLdrReading(int times) {
@@ -214,7 +240,7 @@ int getLdrReading(int times) {
   }
   //calculate the average and return it
   int result = (int)(total / times);
-  if (DEBUG >= 1) {
+  if (DEBUG >= 2) {
     Serial.print("LDR reading is ");
     Serial.println(result);
   }
@@ -260,13 +286,13 @@ void doAction(Color c) {
       if (DEBUG >= 2) {
         Serial.println("Detected red");
       }
-      turn(-1);
+      turn(Left);
       break;
     case Green:
       if (DEBUG >= 2) {
         Serial.println("Detected green");
       }
-      turn(1);
+      turn(Right);
       break;
     case Orange:
       if (DEBUG >= 2) {
@@ -278,13 +304,13 @@ void doAction(Color c) {
       if (DEBUG >= 2) {
         Serial.println("Detected purple");
       }
-      turnTwice(-1);
+      turnTwice(Left);
       break;
     case LightBlue:
       if (DEBUG >= 2) {
         Serial.println("Detected light blue");
       }
-      turnTwice(1);
+      turnTwice(Right);
       break;
     default:
       if (DEBUG >= 2) {
@@ -401,14 +427,15 @@ void loop() {
   if (shouldStop()) {
     stopMoving();
     if (DEBUG >= 1) {
-      Serial.println("Detected black strip!");
+      Serial.println("Stop!");
     }
     ColorRgb color = getColor();
     doAction(colorRgbToColor(color));
-    
+    // Update lastStopTime to start cool down counting
+    lastStopTime = millis();
     startMovingForward();
   } else {
-    
+
     // test ir
     int intensity = getIntensityIr();
     if (DEBUG >= 1) {
@@ -416,10 +443,10 @@ void loop() {
       Serial.println(intensity);
     }
 
-    
+
     // test ultrasonic
     float distance = getDistanceUltraSonic();
-    if (distance > 0) { // < 0 means reading not valid
+    if (distance > 0) {  // < 0 means reading not valid
       if (DEBUG >= 1) {
         Serial.print("Ultrasonic distance is ");
         Serial.println(distance);
@@ -429,8 +456,8 @@ void loop() {
         Serial.println("Ultrasonic distance out of range!");
       }
     }
-    
-    
+
+
     if (distance < ultraSonicDistanceThreshold) {
       if (DEBUG >= 1) {
         Serial.println("Too left, turn right");
@@ -444,6 +471,5 @@ void loop() {
     } else {
       startMovingForward();
     }
-    
   }
 }
