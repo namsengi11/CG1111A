@@ -4,44 +4,47 @@
 #define CONTROL_PIN_0 A2
 #define CONTROL_PIN_1 A3
 #define IR_RECEIVER_PIN A0
-#define ULTRASONIC_PIN 12  // mCore port 1 -> digital pin 12
+#define ULTRASONIC_PIN 12
 #define LDR_PIN A1
 
 // LDR parameters
-#define LDR_WAIT 40
-#define LDR_INTERVAL 10  //in milliseconds
-#define LDR_TIMES 5
+#define LDR_WAIT 40 // Time to wait before LDR takes the first reading, after LED is enabled. In ms
+#define LDR_INTERVAL 10  // Time to wait between each LDR reading. In ms
+#define LDR_TIMES 5 // Number of LDR readings to take for each color.
 
 // Ultrasonic sensor parameters
-#define TIMEOUT 30000       // in us
-#define SPEED_OF_SOUND 340  // in m/s
-#define ultraSonicDistanceThreshold 9.5 // in cm
+#define TIMEOUT 30000       // Timeout for ultrasonic sensor. Any reading larger than this will be ignored. In us
+#define SPEED_OF_SOUND 340  // Speed of sound. In m/s
+#define ultraSonicDistanceThreshold 9.5 // Robot will turn if distance is below this threshold. In cm
 
-// IR parameter
-#define irIntensityThreshold 65
+/*  IR parameter
+ *  Due to the way in which the circuit is constructed, the following reading decreases if IR intensity increases.
+ *  Hence it is not actually IR intensity, but just the analog reading from the port.
+ */
+#define irIntensityThreshold 65 // Robot will turn if intensity falls below this threshold.
 
 
-/* Debug switch.
-    0: no debug
-    1: IR ,ultrasonic, line tracer and motors
-    2: 1 and color sensor
-    3: all
-
-*/
+/*  Debug switch.
+ *  0: No debug. Use for actual runs
+ *  1: IR ,ultrasonic, line tracer and motors
+ *  2: 1 and color sensor
+ *  3: All except detailed LDR readings
+ *  4: All
+ */
 int DEBUG = 0;
 
-// Motors and parameters
-MeDCMotor leftMotor(M1);   // assigning leftMotor to port M1
-MeDCMotor rightMotor(M2);  // assigning RightMotor to port M2
+MeDCMotor leftMotor(M1);   // Assigning leftMotor to port M1
+MeDCMotor rightMotor(M2);  // Assigning RightMotor to port M2
 
+// Motor speeds for going straight.
 uint8_t rightSpeed = 255;
 uint8_t leftSpeed = 255;
 
-// Line follower
+// Line follower port assignment
 MeLineFollower lineFinder(PORT_2);
 
-// Buzzer
-MeBuzzer buzzer;  // create the buzzer object
+// Buzzer 
+MeBuzzer buzzer;  // Create the buzzer object
 
 // ColorRgb struct and Color enum definition
 typedef struct ColorsRgb {
@@ -50,7 +53,7 @@ typedef struct ColorsRgb {
   int b;
 } ColorRgb;
 
-
+// Only contains the colors of color paper
 enum Color {
   Red,
   Green,
@@ -60,11 +63,13 @@ enum Color {
   White
 };
 
-// Always remeasure the rgb values below after changing this!
+// LDR readings for black and white color
+// Always remeasure the rgb values below after changing this! This affects the RGB values obtained.
 float whiteValues[] = { 704, 936, 801 };
 float blackValues[] = { 288, 605, 431 };
 
-// Always remeasure these values after changing the values above!
+// RGB values for color paper. Range is from 0~255.
+// Always remeasure these values after changing the values above! Changes in the values above affects the RGB values obtained.
 ColorRgb red = { 232, 118, 91 };
 ColorRgb green = { 44, 181, 123 };
 ColorRgb orange = { 250, 180, 135 };
@@ -72,7 +77,7 @@ ColorRgb purple = { 125, 158, 161 };
 ColorRgb lightBlue = { 107, 218, 223 };
 ColorRgb white = { 255, 255, 255 };
 
-// To be initialized after startup
+// To be initialized after startup. Grey difference = white value - black value.
 float greyDifference[] = { 0, 0, 0 };
 
 // Direction enum
@@ -81,7 +86,7 @@ enum Direction {
   Right
 };
 
-// Component management
+// Enum for component management
 enum Component {
   R,
   G,
@@ -89,6 +94,7 @@ enum Component {
   IrEmmiter
 };
 
+//Enables a given component. The component will remain on after returning from this function.
 void enableComponent(Component c) {
   switch (c) {
     case R:
@@ -130,10 +136,13 @@ void enableComponent(Component c) {
   }
 }
 
-// Course logic and utils
+// Following functions are for course logic and utilities
+
+
+// Plays the celebration song
 void celebrate() {
   // Each of the following "function calls" plays a single tone.
-  // The numbers in the bracket specify the frequency and the duration (ms)
+  // The numbers in the bracket specify the frequency and the duration (in ms)
   buzzer.tone(392, 200);
   buzzer.tone(523, 200);
   buzzer.tone(659, 200);
@@ -143,16 +152,19 @@ void celebrate() {
   buzzer.noTone();
 }
 
+// Makes the robot move forward. The robot will continue to move after returning from this function.
 void startMovingForward() {
   leftMotor.run(-leftSpeed);
   rightMotor.run(rightSpeed);
 }
 
+// Stops the robot from moving.
 void stopMoving() {
   leftMotor.run(0);
   rightMotor.run(0);
 }
 
+// Adjust the direction of the robot according to readings from IR receiver and ultrasonic sensor.
 void adjust(Direction d) {
   switch (d) {
     case Left:
@@ -170,6 +182,7 @@ void adjust(Direction d) {
   }
 }
 
+// Makes the robot do a 90 degree turn. The robot will stop after returning from this function.
 void turn(Direction d) {
   switch (d) {
     case Left:
@@ -191,6 +204,7 @@ void turn(Direction d) {
   stopMoving();
 }
 
+// Makes the robot do a clockwise 180 degree turn. The robot will stop after returning from this function.
 void turn180() {
   leftMotor.run(-leftSpeed);
   rightMotor.run(-rightSpeed);
@@ -198,6 +212,8 @@ void turn180() {
   stopMoving();
 }
 
+// Makes the robot do a 90 degree turn, move forward for one chunk, and do another 90 degree turn in the same direction.
+// The robot will stop after returning from this function.
 void turnTwice(Direction d) {
   turn(d);
   startMovingForward();
@@ -207,6 +223,7 @@ void turnTwice(Direction d) {
   turn(d);
 }
 
+// Ruturns true if black strip is detected. False otherwise.
 bool shouldStop() {
   bool isBlackStripDetected = lineFinder.readSensors() == S1_IN_S2_IN;
   if (DEBUG >= 1) {
@@ -216,11 +233,11 @@ bool shouldStop() {
   return isBlackStripDetected;
 }
 
+// Takes a given number of times of LDR readings, and returns the average reading.
 int getLdrReading(int times) {
   delay(LDR_WAIT);
-  //find the average reading for the requested number of times of scanning LDR
   int total = 0;
-  //take the reading as many times as requested and add them up
+  // Take the reading as many times as requested and add them up
   for (int i = 0; i < times; i += 1) {
     int reading = analogRead(LDR_PIN);
     total += reading;
@@ -232,7 +249,7 @@ int getLdrReading(int times) {
     }
     delay(LDR_INTERVAL);
   }
-  //calculate the average and return it
+  // Calculates the average and return it
   int result = (int)(total / times);
   if (DEBUG >= 2) {
     Serial.print("LDR reading is ");
@@ -241,6 +258,7 @@ int getLdrReading(int times) {
   return result;
 }
 
+// Returns the analog reading from IR receiver. The return value decreases if IR intensity increases.
 int getIntensityIr() {
   delay(10);
   enableComponent(IrEmmiter);
@@ -250,6 +268,7 @@ int getIntensityIr() {
   return intensity;
 }
 
+// Returns the distance to the wall measured by the ultrasonic sensor.
 float getDistanceUltraSonic() {
   pinMode(ULTRASONIC_PIN, OUTPUT);
 
@@ -267,6 +286,7 @@ float getDistanceUltraSonic() {
   }
 }
 
+// Makes the robot do action according to the given color.
 void doAction(Color c) {
   switch (c) {
     case White:
@@ -274,7 +294,7 @@ void doAction(Color c) {
         Serial.println("Detected white");
       }
       celebrate();
-      delay(999999999);
+      delay(999999999); // Stops the robot
       break;
     case Red:
       if (DEBUG >= 2) {
@@ -314,8 +334,10 @@ void doAction(Color c) {
 }
 
 
-// Color related stuff
+// Following functions are for color-related jobs.
 
+
+// Normalizes a ratio value. The return value will be between 0 ~ 1.
 float normalizeProportion(float n) {
   float result = n;
   if (n < 0) {
@@ -323,18 +345,21 @@ float normalizeProportion(float n) {
   } else if (n > 1) {
     result = 1;
   }
-  // Squaring result to produce a y = x ^ 2 curve.
+  // Squaring result to produce a y = x ^ 2 curve. Not as good as the linear approach, hence not used.
   //result = result * result;
   return result;
 }
 
+
+// Returns the difference between two colors given their respective RGB values.
 float getColorDifference(ColorRgb colorA, ColorRgb colorB) {
-  //quadratic approach
+  // Quadratic approach.
   return pow(colorA.r - colorB.r, 2) + pow(colorA.g - colorB.g, 2) + pow(colorA.b - colorB.b, 2);
-  //linear approach
+  // Linear approach. Not as good as the quadratic approach, hence not used.
   //return fabs(colorA.r - colorB.r) + fabs(colorA.g - colorB.g) + fabs(colorA.b - colorB.b);
 }
 
+// Converts a ColorRgb to a Color enum.
 Color colorRgbToColor(ColorRgb c) {
   Color result = White;
   float minDiff = getColorDifference(c, white);
@@ -370,6 +395,7 @@ Color colorRgbToColor(ColorRgb c) {
   return result;
 }
 
+// Gets the ColorRgb detected using diodes and LDR.
 ColorRgb getColor() {
   ColorRgb color;
   enableComponent(R);
@@ -404,61 +430,65 @@ void setup() {
   //IR initialization
   pinMode(IR_RECEIVER_PIN, INPUT);
 
-  //control pins initialization
+  //Control pins initialization. Turn on the red LED since it is the default state.
   enableComponent(R);
 
-  //initialize grey difference
+  //Initialize grey differences
   for (int i = 0; i < 3; i += 1) {
     greyDifference[i] = whiteValues[i] - blackValues[i];
   }
   Serial.begin(9600);
 
+  // Wait for 2 seconds
   delay(2000);
+
+  // Make the robot move forward.
   startMovingForward();
 }
 
 void loop() {
-  if (shouldStop()) {
+  // Checks if black strip is detected.
+  if (shouldStop()) { // Black strip detected. Do action according to color detected.
     stopMoving();
     if (DEBUG >= 1) {
       Serial.println("Stop!");
     }
     ColorRgb color = getColor();
     doAction(colorRgbToColor(color));
-  } else {
-
-    // test ir
+  } else { // Black strip not detected. Adjust the direction of the robot according to IR and ultrasonic readings.
+    // Obtain IR reading.
     int intensity = getIntensityIr();
     if (DEBUG >= 1) {
       Serial.print("IR intensity is ");
       Serial.println(intensity);
     }
 
-    // test ultrasonic
+    // Obtain ultrasonic reading.
     float distance = getDistanceUltraSonic();
-    if (distance > 0) {  // < 0 means reading not valid
+    if (distance > 0) {
       if (DEBUG >= 1) {
         Serial.print("Ultrasonic distance is ");
         Serial.println(distance);
       }
-    } else {
+    } else { // Reading < 0 means reading not valid
       if (DEBUG >= 1) {
         Serial.println("Ultrasonic distance out of range!");
       }
     }
 
-    // Do action according to readings
-    if (distance < ultraSonicDistanceThreshold) {
+    // Adjust the direction according to the readings.
+    // The ultrasonic sensor has a higher priority, because its reading is more stable and reliable than the IR receiver.
+    if (distance < ultraSonicDistanceThreshold) { // Too close to left walls, adjust to right.
       if (DEBUG >= 1) {
         Serial.println("Too left, turn right");
       }
       adjust(Right);
-    } else if (intensity < irIntensityThreshold) {
+    } else if (intensity < irIntensityThreshold) { // Too close to right walls, adjust to left.
       if (DEBUG >= 1) {
         Serial.println("Too right, turn left");
       }
       adjust(Left);
-    } else {
+    } else { // Not too close to any walls. Move forward.
       startMovingForward();
     }
   }
